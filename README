@@ -1,4 +1,4 @@
-To compile, do
+To compile on Cheyenne, do
 
 chpl main.chpl --cpp-lines -Llibpng-1.6.38/.libs -lpng16 --fast
 
