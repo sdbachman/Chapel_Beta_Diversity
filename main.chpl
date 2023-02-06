@@ -14,9 +14,12 @@ config const dissimilarity_file : string;    /* name of the file with dissimilar
 config const window_size : real;                  /* the desired area of the neighborhood (in meters^2) */
 config const dx : real;                      /* the resolution of the raster image (in meters) */
 
-proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, CenterMask : [] bool, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real, Output: [] real, d_size : int, Mask_Size : int,  t: stopwatch) : [] {
+proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real, Output: [] real, d_size : int, Mask_Size : int,  t: stopwatch) : [] {
 
+  // This 'eps' makes sure that we differentiate between land points (zero) and ocean points (nonzero), even
+  // if the beta diversity at the ocean point is zero.
   param eps = 0.00001;
+
   var first_point = centerPoints.first[1];
   var last_point = centerPoints.last[1];
 
@@ -32,7 +35,7 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, CenterMask : []
         B_left[tmp] = B_left[tmp] + 1;
       }
       for m in CenterMaskDomain do {
-        var tmp = Image[(center,first_point) + m]*CenterMask[m];
+        var tmp = Image[(center,first_point) + m];
         B_center[tmp] = B_center[tmp] + 1;
       }
       for m in RightMaskDomain do {
@@ -160,15 +163,13 @@ proc main(args: [] string) {
     const locImage : [locImageDomain] Image.eltType = Image;
 
     const locLeftMaskDomain = LeftMask.domain;
-    const locRightMaskDomain = RightMask.domain;
-
     const locCenterMaskDomain = CenterMask.domain;
-    const locCenterMask : [locCenterMaskDomain] CenterMask.eltType = CenterMask;
+    const locRightMaskDomain = RightMask.domain;
 
     const locDissDomain = d_domain;
     const locDiss : [locDissDomain] dissimilarity.eltType = dissimilarity;
 
-    convolve_and_calculate(locImage, D.localSubdomain(), locCenterMask, locLeftMaskDomain, locCenterMaskDomain, locRightMaskDomain, locDiss, OutputArray, loc_d_size, loc_Mask_Size, t);
+    convolve_and_calculate(locImage, D.localSubdomain(), locLeftMaskDomain, locCenterMaskDomain, locRightMaskDomain, locDiss, OutputArray, loc_d_size, loc_Mask_Size, t);
   }
 
 
