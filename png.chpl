@@ -61,7 +61,7 @@ extern proc free_rgbimage(img : c_ptr(c_ptr(rgbimage))) : void;
 extern proc PNG_isa(fname : c_string) : c_int;
 
 
-proc load_PNG_into_array(fname : string, t : Timer) {
+proc load_PNG_into_array(fname : string, t : stopwatch) {
 
   // Read in PNG
   var rgb_ptr : c_ptr(rgbimage);
@@ -83,7 +83,7 @@ proc load_PNG_into_array(fname : string, t : Timer) {
   return (rgb_ptr, Image);
 }
 
-proc write_array_to_PNG(outfile : string, array : ?, rgb_ptr: ?, t : Timer) {
+proc write_array_to_PNG(outfile : string, array : ?, rgb_ptr: ?, t : stopwatch) {
 
   // Read in PNG
   var rgb = rgb_ptr.deref();
@@ -193,7 +193,7 @@ if (!PNG_isa(inname.c_str())) then
 if ("" == outname) then
   usage("missing --outname");
 
-var t : Timer;
+var t : stopwatch;
 var rgb_ptr : c_ptr(rgbimage);
 
 t.start();

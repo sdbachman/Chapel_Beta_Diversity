@@ -14,7 +14,7 @@ config const dissimilarity_file : string;    /* name of the file with dissimilar
 config const window_size : real;                  /* the desired area of the neighborhood (in meters^2) */
 config const dx : real;                      /* the resolution of the raster image (in meters) */
 
-proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, CenterMask : [] bool, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real, Output: [] real, d_size : int, Mask_Size : int,  t: Timer) : [] {
+proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, CenterMask : [] bool, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real, Output: [] real, d_size : int, Mask_Size : int,  t: stopwatch) : [] {
 
   param eps = 0.00001;
   var first_point = centerPoints.first[1];
@@ -106,7 +106,7 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, CenterMask : []
 
 proc main(args: [] string) {
 
-  var t : Timer;
+  var t : stopwatch;
   t.start();
 
   // Gather input variables from command line
