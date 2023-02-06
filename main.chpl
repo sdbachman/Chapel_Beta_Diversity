@@ -113,12 +113,6 @@ proc main(args: [] string) {
   t.start();
 
   // Gather input variables from command line
-  /*
-  const input_file = args[1];
-  const dissimilarity_file = args[2];
-  const window_size : real = (args[3] : real);
-  const dx : real = (args[4] : real);
-  */
   const radius = (sqrt(window_size) / 2) : int;
   const nx = (radius / dx) : int;
   writeln("Distance circle has a radius of ", nx, " points.");
