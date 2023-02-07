@@ -110,6 +110,7 @@ proc write_array_to_PNG(outfile : string, array : ?, rgb_ptr: ?, t : stopwatch) 
       rgb.r[xy] = (min(max( 0, 1.5 - abs(1 - 4*( array[element]/maxval - 0.50))),1) * 255) : uint(8);
       rgb.g[xy] = (min(max( 0, 1.5 - abs(1 - 4*( array[element]/maxval - 0.25))),1) * 255) : uint(8);
       rgb.b[xy] = (min(max( 0, 1.5 - abs(1 - 4*( array[element]/maxval       ))),1) * 255) : uint(8);
+
     }
 
 

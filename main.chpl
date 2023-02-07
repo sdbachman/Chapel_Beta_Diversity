@@ -2,6 +2,7 @@ use png;
 use distance_mask;
 use dissimilarity;
 use beta_diversity;
+use IO_Module;
 use BlockDist;
 use Time;
 use AutoMath;
@@ -176,5 +177,9 @@ proc main(args: [] string) {
   write_array_to_PNG(outname, GatheredArray, rgb_ptr, t);
 
   writeln("Elapsed time to write PNG: ", t.elapsed(), " seconds.");
+
+  WriteOutput(GatheredArray, ImageSpace, offset);
+
+  writeln("Elapsed time to write NetCDF: ", t.elapsed(), " seconds.");
 }
 
