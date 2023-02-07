@@ -1,6 +1,6 @@
 To compile on Cheyenne, do
 
-chpl main.chpl --cpp-lines -Llibpng-1.6.38/.libs -lpng16 --fast
+chpl main.chpl --cpp-lines -Llibpng-1.6.38/.libsa -lpng16 -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -I/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/include --ldflags="-Wl,-rpath,/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib" --fast
 
 To run, do
 
