@@ -14,11 +14,6 @@ proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
 
     /* Need to do this, otherwise the NetCDF image will come out upside down */
 
-    writeln(offset);
-    writeln(D);
-    writeln(D.shape);
-    writeln(D.last);
-
     var arr_tmp : [D] real;
     for (i,j) in D {
       arr_tmp[i,j] = arr_in[D.last[0]+offset-i,j];
