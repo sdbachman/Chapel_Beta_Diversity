@@ -1,7 +1,6 @@
 use NetCDF.C_NetCDF;
 
-proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
-
+proc CreateNetCDF(filename : string, ImageSpace : ?, out varid_out) {
   /* IDs for the netCDF file, dimensions, and variables. */
     var ncid, x_dimid, y_dimid : c_int;
     var x_varid, y_varid : c_int;
@@ -12,22 +11,12 @@ proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
 
     var shape = ImageSpace.shape;
 
-    /* Need to do this, otherwise the NetCDF image will come out upside down */
-
-    var arr_tmp : [D] real;
-    for (i,j) in D {
-      arr_tmp[i,j] = arr_in[D.last[0]+offset-i,j];
-    }
-
-    var arr_out : [ImageSpace] real = -999;
-    arr_out[D] = arr_tmp;
-
-    var yo : [1..arr_out.shape[0]] real;
-    var xo : [1..arr_out.shape[1]] real;
-    for i in 1..arr_out.shape[0] {
+    var yo : [1..shape[0]] real(32);
+    var xo : [1..shape[1]] real(32);
+    for i in 1..shape[0] {
       yo[i] = i;
     }
-    for i in 1..arr_out.shape[1] {
+    for i in 1..shape[1] {
       xo[i] = i;
     }
 
@@ -36,7 +25,7 @@ proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
 
   /* Create the file. */
     extern proc nc_create(path : c_string, cmode : c_int, ncidp : c_ptr(c_int)) : c_int;
-    nc_create( ("out.nc").c_str(), NC_CLOBBER, c_ptrTo(ncid));
+    nc_create( filename.c_str(), NC_CLOBBER, c_ptrTo(ncid));
 
   /* Define the dimensions. The record dimension is defined to have
      unlimited length - it can grow as needed. In this example it is
@@ -47,8 +36,8 @@ proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
 
   /* Define the coordinate variables. */
     extern proc nc_def_var(ncid : c_int, name : c_string, xtype : nc_type, ndims : c_int, dimidsp : c_ptr(c_int), varidp : c_ptr(c_int)) : c_int;
-      nc_def_var(ncid, yName.c_str(), NC_DOUBLE, 1 : c_int, c_ptrTo(y_dimid), c_ptrTo(y_varid));
-      nc_def_var(ncid, xName.c_str(), NC_DOUBLE, 1 : c_int, c_ptrTo(x_dimid), c_ptrTo(x_varid));
+      nc_def_var(ncid, yName.c_str(), NC_FLOAT, 1 : c_int, c_ptrTo(y_dimid), c_ptrTo(y_varid));
+      nc_def_var(ncid, xName.c_str(), NC_FLOAT, 1 : c_int, c_ptrTo(x_dimid), c_ptrTo(x_varid));
 
   /* Assign units attributes to coordinate variables. */
   //  att_text = "meters";
@@ -62,48 +51,65 @@ proc WriteOutput(ref arr_in: [?D] real, ImageSpace : ?, offset : int) {
     dimids[1] = x_dimid;
 
   /* Define the netCDF variable. */
-    nc_def_var(ncid, "beta_diversity".c_str(), NC_DOUBLE, ndims : c_int, c_ptrTo(dimids[0]), c_ptrTo(varid));
+    nc_def_var(ncid, "beta_diversity".c_str(), NC_FLOAT, ndims : c_int, c_ptrTo(dimids[0]), c_ptrTo(varid));
+    varid_out = varid : int;
 
   /* Assign units attributes to the netCDF variables. */
 
+    /*
     var maxval = max reduce(arr_out);
     var valid_range = "(0, " + (maxval : string) + ")";
     //nc_put_att_text(ncid, varid, "units".c_str(), units.numBytes : c_size_t, units.c_str());
     nc_put_att_text(ncid, varid, "Range".c_str(), valid_range.numBytes : c_size_t, valid_range.c_str());
+    */
 
     //int nc_def_var_fill(int ncid, int varid, int no_fill, const void* fill_value)
-    extern proc nc_def_var_fill(ncid : c_int, varid : c_int, no_fill : c_int, fill_value : c_ptr(c_double));
-    var fv = -999 : real;
+    extern proc nc_def_var_fill(ncid : c_int, varid : c_int, no_fill : c_int, fill_value : c_ptr(c_float));
+    var fv = -999 : real(32);
     nc_def_var_fill(ncid, varid, 0, c_ptrTo(fv));
 
   /* End define mode. */
     nc_enddef(ncid);
 
   /* Write the coordinate variable data. */
-    extern proc nc_put_var_double(ncid : c_int, varid : c_int, op : c_ptr(c_double)) : c_int;
-    nc_put_var_double(ncid, y_varid, c_ptrTo(yo[0]));
-    nc_put_var_double(ncid, x_varid, c_ptrTo(xo[0]));
+    extern proc nc_put_var_float(ncid : c_int, varid : c_int, op : c_ptr(c_float)) : c_int;
+    nc_put_var_float(ncid, y_varid, c_ptrTo(yo[0]));
+    nc_put_var_float(ncid, x_varid, c_ptrTo(xo[0]));
+
+    nc_close(ncid);
+}
+
+proc WriteOutput(filename : string, ref arr_out: [?D] real(32), ImageSpace : ?, varid_in : int, offset : int) {
+
+
+coforall loc in Locales do on loc {
+
+  var ncid : c_int;
+  var varid = varid_in : c_int;
+
+  extern proc nc_open(path : c_string, mode : c_int, ncidp : c_ptr(c_int)) : c_int;
+  nc_open( filename.c_str() , NC_WRITE, c_ptrTo(ncid));
 
   /* Determine where to start reading file, and how many elements to read */
   // Start specifies a hyperslab.  It expects an array of dimension sizes
-   // var start = tuplify(ImageSpace.localSubdomain().first);
+    var start = tuplify(D.localSubdomain().first);
   // Count specifies a hyperslab.  It expects an array of dimension sizes
-   // var count = tuplify(ImageSPace.localSubdomain().shape);
-
-    var start = (0,0);
-    var count = ImageSpace.shape;
+    var count = tuplify(D.localSubdomain().shape);
 
     var start_c : [0..#start.size] c_size_t;
     var count_c : [0..#count.size] c_size_t;
-    for i in 0..count.size {
+
+    for i in 0..<count.size {
+      start_c[i] = start[i] : c_size_t;
       count_c[i] = count[i] : c_size_t;
     }
 
-    extern proc nc_put_vara_double(ncid : c_int, varid : c_int, startp : c_ptr(c_size_t), countp : c_ptr(c_size_t), op : c_ptr(c_double)) : c_int;
-    nc_put_vara_double(ncid, varid, c_ptrTo(start_c), c_ptrTo(count_c), c_ptrTo(arr_out[start]));
+    extern proc nc_put_vara_float(ncid : c_int, varid : c_int, startp : c_ptr(c_size_t), countp : c_ptr(c_size_t), op : c_ptr(c_float)) : c_int;
+    nc_put_vara_float(ncid, varid, c_ptrTo(start_c), c_ptrTo(count_c), c_ptrTo(arr_out[start]));
 
     nc_close(ncid);
 
+  }
 }
 
 inline proc tuplify(x) {

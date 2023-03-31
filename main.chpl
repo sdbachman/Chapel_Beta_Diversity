@@ -1,25 +1,30 @@
-use png;
+//use png;
 use distance_mask;
 use dissimilarity;
 use beta_diversity;
 use IO_Module;
+use IO;
 use BlockDist;
 use Time;
 use AutoMath;
 use LinearAlgebra;
 
 /* Command line arguments. */
-config const inname : string;                /* name of PNG file to read */
-config const outname : string;               /* name of PNG file to write at the end */
+config const in_array : string;                /* name of binary file to read */
 config const dissimilarity_file : string;    /* name of the file with dissimilarity coefficients */
-config const window_size : real;                  /* the desired area of the neighborhood (in meters^2) */
-config const dx : real;                      /* the resolution of the raster image (in meters) */
+config const window_size : real(32);                  /* the desired area of the neighborhood (in meters^2) */
+config const dx : real(32);                      /* the resolution of the raster image (in meters) */
+config const out_file : string;
+config const cols : int = 1;
+config const rows : int = 1;
 
-proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real, Output: [] real, d_size : int, Mask_Size : int,  t: stopwatch) : [] {
+proc convolve_and_calculate(Image: [] int(8), centerPoints : ?, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real(32), Output: [] real(32), d_size : int, Mask_Size : int,  t: stopwatch) : [] {
 
   // This 'eps' makes sure that we differentiate between land points (zero) and ocean points (nonzero), even
   // if the beta diversity at the ocean point is zero.
   param eps = 0.00001;
+
+  //writeln("On ", here.id, " centerPoints is: ", centerPoints);
 
   var first_point = centerPoints.first[1];
   var last_point = centerPoints.last[1];
@@ -27,9 +32,9 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain 
   forall center in centerPoints[..,first_point] {
 
       // Calculate masks and beta diversity for leftmost point in subdomain
-      var B_left: [0..(d_size-1)] real = 0;
-      var B_center: [0..(d_size-1)] real = 0;
-      var B_right: [0..(d_size-1)] real = 0;
+      var B_left: [0..(d_size-1)] real(32) = 0;
+      var B_center: [0..(d_size-1)] real(32) = 0;
+      var B_right: [0..(d_size-1)] real(32) = 0;
 
       for m in LeftMaskDomain do {
         var tmp = Image[(center,first_point) + m];
@@ -45,7 +50,7 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain 
       }
 
       var B = B_left + B_center + B_right;
-      var B_center_prev = B_center;
+      var B_old = B;
 
       // If we are over land, return zero
       if (Image[center,first_point] == 0) {
@@ -57,30 +62,31 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain 
       }
       // If we are on a reef point, calculate beta diversity
       else {
-        var num_habitat_pixels = (+ reduce B[1..(d_size-2)]) : real;
+        var num_habitat_pixels = (+ reduce B[1..(d_size-2)]) : real(32);
         var habitat_frac = num_habitat_pixels / Mask_Size;
 
         var P = B / num_habitat_pixels;
 
         var beta = + reduce (dissimilarity * outer(P,P));
-        Output[center,first_point] = habitat_frac * beta;
+        Output[center,first_point] = (habitat_frac * beta) : real(32);
       }
 
       for point in (first_point+1)..last_point do {
-        B_center = B_center_prev + B_right - B_left;
-        B_center_prev = B_center;
-        B_left = 0;
-        B_right = 0;
 
-        for m in LeftMaskDomain do {
-          var tmp = Image[(center,point) + m];
-          B_left[tmp] = B_left[tmp] + 1;
-        }
+        B_right = 0;
         for m in RightMaskDomain do {
           var tmp = Image[(center,point) + m];
           B_right[tmp] = B_right[tmp] + 1;
         }
-        B = B_left + B_center + B_right;
+        B = B_old + B_right - B_left;
+        B_old = B;
+        B_left = 0;
+
+        // Update B_left
+        for m in LeftMaskDomain do {
+          var tmp = Image[(center,point) + m];
+          B_left[tmp] = B_left[tmp] + 1;
+        }
 
         // If we are over land, return zero
         if (Image[center,point] == 0) {
@@ -92,13 +98,13 @@ proc convolve_and_calculate(Image: [] int(64), centerPoints : ?, LeftMaskDomain 
         }
         // If we are on a reef point, calculate beta diversity
         else {
-          var num_habitat_pixels = (+ reduce B[1..(d_size-2)]) : real;
+          var num_habitat_pixels = (+ reduce B[1..(d_size-2)]) : real(32);
           var habitat_frac = num_habitat_pixels / Mask_Size;
 
           var P = B / num_habitat_pixels;
 
           var beta = + reduce (dissimilarity * outer(P,P));
-          Output[center,point] = habitat_frac * beta + eps;
+          Output[center,point] = (habitat_frac * beta + eps) : real(32);
         }
       }
   }
@@ -118,11 +124,12 @@ proc main(args: [] string) {
   const nx = (radius / dx) : int;
   writeln("Distance circle has a radius of ", nx, " points.");
 
-  // Read in PNG
-  var (rgb_ptr, Image) = load_PNG_into_array(inname, t);
-  const ImageSpace = Image.domain;
-  writeln("ImageSpace is ", ImageSpace);
-  writeln("Elapsed time to read into array: ", t.elapsed(), " seconds.");
+  const ImageSpace = {0..<rows, 0..<cols};
+  var Image : [ImageSpace] int(8);
+
+  // Read in array
+  var f = open(in_array, iomode.r);
+  var r = f.reader(kind=ionative);
 
   // Read in dissimilarity coefficients
   var (dissimilarity, d_size) = ReadArray(dissimilarity_file);
@@ -138,24 +145,40 @@ proc main(args: [] string) {
   const Inner = ImageSpace.expand(-offset);
   const myTargetLocales = reshape(Locales, {1..Locales.size, 1..1});
   const D = Inner dmapped Block(Inner, targetLocales=myTargetLocales);
-  var OutputArray : [D] real;
+  var OutputArray : [D] real(32);
+
+  // Create NetCDF
+  var varid : int;
+  CreateNetCDF(out_file, ImageSpace, varid);
 
   writeln("Elapsed time at start of coforall loop: ", t.elapsed(), " seconds.");
 
   writeln("Starting coforall loop.");
 
-  coforall loc in Locales do on loc {
+//////////////////////////////////////////////////////////////////////////
 
-    // If I put "create_distance_mask" inside this loop I need to declare local copies of these variables,
-    // otherwise it seems like Chapel will have to do a ton
-    // of cross-locale calls to access these variables. This seems to double the amount of time it
-    // takes to run through the coforall loop for all non-head locales!
+  coforall loc in Locales do on loc {
 
     const loc_d_size = d_size;
     const loc_Mask_Size = Mask_Size;
 
-    const locImageDomain = Image.domain;
-    const locImage : [locImageDomain] Image.eltType = Image;
+    var locD = D.localSubdomain();
+    var locD_plus = locD.expand(offset);
+    var locImage : [locD_plus] int(8);
+
+    // Read in array
+    var f = open(in_array, iomode.r);
+    var first_point = locD_plus.first[0]*locD_plus.shape[1] + locD_plus.first[1];
+    var r = f.reader(kind=ionative, region=first_point..);
+
+    for i in locD_plus.first[0]..locD_plus.last[0] {
+      for j in locD_plus.first[1]..locD_plus.last[1] {
+        var tmp : int(8);
+        r.readBinary(tmp);
+        locImage[i,j] = tmp;
+      }
+    }
+    r.close();
 
     const locLeftMaskDomain = LeftMask.domain;
     const locCenterMaskDomain = CenterMask.domain;
@@ -167,19 +190,11 @@ proc main(args: [] string) {
     convolve_and_calculate(locImage, D.localSubdomain(), locLeftMaskDomain, locCenterMaskDomain, locRightMaskDomain, locDiss, OutputArray, loc_d_size, loc_Mask_Size, t);
   }
 
-
   writeln("Elapsed time to finish coforall loop: ", t.elapsed(), " seconds.");
 
-  // Gather back to the head node
-  var GatheredArray : [Inner] real;
-  GatheredArray = OutputArray;
-
-  write_array_to_PNG(outname, GatheredArray, rgb_ptr, t);
-
-  writeln("Elapsed time to write PNG: ", t.elapsed(), " seconds.");
-
-  WriteOutput(GatheredArray, ImageSpace, offset);
+  WriteOutput(out_file, OutputArray, ImageSpace, varid, offset);
 
   writeln("Elapsed time to write NetCDF: ", t.elapsed(), " seconds.");
+
 }
 

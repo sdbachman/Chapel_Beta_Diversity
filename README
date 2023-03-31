@@ -1,7 +1,18 @@
 To compile on Cheyenne, do
 
-chpl main.chpl --cpp-lines -Llibpng-1.6.38/.libsa -lpng16 -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -I/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/include --ldflags="-Wl,-rpath,/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib" --fast
+chpl main_big.chpl -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -I/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/include --ldflags="-Wl,-rpath,/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib" --fast
+
+5 Ha   = 50000 m   = 63662
+10 Ha  = 100000 m  = 127324
+25 Ha  = 250000 m  = 318350
+50 Ha  = 500000 m  = 636620
+75 Ha  = 750000 m  = 954930
+100 Ha = 1000000 m = 1273240
+150 Ha = 1500000 m = 1909860
 
 To run, do
 
-./main -nl 4 --inname=Roatan_benthic_r3_gray.png --outname=outt.png --dissimilarity_file=benthic.txt --window_size=100000 --dx=5
+./main -nl 1 --in_array=Oahu_geomorph_mask_gray_1_8.bin --dissimilarity_file=geomorphic.txt --window_size=1273240 --dx=5 --rows=3924 --cols=5300 --out_file=out.nc
+
+file (image_name) = COLS x ROWS
+
