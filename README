@@ -1,6 +1,6 @@
 To compile on Cheyenne, do
 
-chpl main_big.chpl -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -I/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/include --ldflags="-Wl,-rpath,/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib" --fast
+chpl main.chpl -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -I/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/include --ldflags="-Wl,-rpath,/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib" --fast
 
 5 Ha   = 50000 m   = 63662
 10 Ha  = 100000 m  = 127324
@@ -10,9 +10,19 @@ chpl main_big.chpl -lnetcdf -L/glade/u/apps/ch/opt/netcdf/4.8.1/gnu/10.1.0/lib -
 100 Ha = 1000000 m = 1273240
 150 Ha = 1500000 m = 1909860
 
+Morven
+2827    ---> 3600
+11309   ---> 14400
+31415   ---> 40000
+
 To run, do
 
 ./main -nl 1 --in_array=Oahu_geomorph_mask_gray_1_8.bin --dissimilarity_file=geomorphic.txt --window_size=1273240 --dx=5 --rows=3924 --cols=5300 --out_file=out.nc
+
+./main -nl 1 --in_name=Roatan --map_type=geomorphic --window_size=63662
+config const in_name : string
+config const map_type : string
+config const window_size : real(32)
 
 file (image_name) = COLS x ROWS
 

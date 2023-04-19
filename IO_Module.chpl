@@ -79,10 +79,14 @@ proc CreateNetCDF(filename : string, ImageSpace : ?, out varid_out) {
     nc_close(ncid);
 }
 
-proc WriteOutput(filename : string, ref arr_out: [?D] real(32), ImageSpace : ?, varid_in : int, offset : int) {
+var y: atomic int;
 
+proc WriteOutput(filename : string, ref arr_out: [?D] real(32), varid_in : int) {
 
 coforall loc in Locales do on loc {
+
+  y.waitFor(here.id%numLocales);
+  writeln("Starting on ", here.id);
 
   var ncid : c_int;
   var varid = varid_in : c_int;
@@ -105,10 +109,14 @@ coforall loc in Locales do on loc {
     }
 
     extern proc nc_put_vara_float(ncid : c_int, varid : c_int, startp : c_ptr(c_size_t), countp : c_ptr(c_size_t), op : c_ptr(c_float)) : c_int;
+    for i in 1..5 {
     nc_put_vara_float(ncid, varid, c_ptrTo(start_c), c_ptrTo(count_c), c_ptrTo(arr_out[start]));
+    }
 
     nc_close(ncid);
 
+  const inc = (y.read() + 1) % numLocales;
+  y.write(inc);
   }
 }
 

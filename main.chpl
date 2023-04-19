@@ -8,15 +8,14 @@ use BlockDist;
 use Time;
 use AutoMath;
 use LinearAlgebra;
+use IO.FormattedIO;
 
 /* Command line arguments. */
-config const in_array : string;                /* name of binary file to read */
-config const dissimilarity_file : string;    /* name of the file with dissimilarity coefficients */
-config const window_size : real(32);                  /* the desired area of the neighborhood (in meters^2) */
-config const dx : real(32);                      /* the resolution of the raster image (in meters) */
-config const out_file : string;
-config const cols : int = 1;
-config const rows : int = 1;
+config const in_name : string;
+config const map_type : string;
+config const window_size : real(32);
+config const dx : real(32) = 5.0;
+
 
 proc convolve_and_calculate(Image: [] int(8), centerPoints : ?, LeftMaskDomain : ?, CenterMaskDomain : ?, RightMaskDomain : ?, dissimilarity : [] real(32), Output: [] real(32), d_size : int, Mask_Size : int,  t: stopwatch) : [] {
 
@@ -124,14 +123,23 @@ proc main(args: [] string) {
   const nx = (radius / dx) : int;
   writeln("Distance circle has a radius of ", nx, " points.");
 
+  // Open the text file that contains the number of rows and columns for the image.
+  var infile = open(in_name + "_" + map_type + ".txt", iomode.r);
+  var reader = infile.reader();
+  // Read the number of rows and columns in the array in from the file.
+  var rows = reader.read(int);
+  var cols = reader.read(int);
+
   const ImageSpace = {0..<rows, 0..<cols};
   var Image : [ImageSpace] int(8);
 
   // Read in array
-  var f = open(in_array, iomode.r);
+  //var f = open(in_array, iomode.r);
+  var f = open(in_name + "_" + map_type + ".bin", iomode.r);
   var r = f.reader(kind=ionative);
 
   // Read in dissimilarity coefficients
+  var dissimilarity_file = map_type + ".txt";
   var (dissimilarity, d_size) = ReadArray(dissimilarity_file);
 
   // Shift the domain so that it starts at 0
@@ -149,6 +157,12 @@ proc main(args: [] string) {
 
   // Create NetCDF
   var varid : int;
+  var Ha = window_size / 10000 / (4.0 / pi);
+  var zero_pad = 3 - (Ha : string).size;
+  var nonzero : string = "%3.1dr".format(Ha);
+  var Ha_string : string = (zero_pad*"0") + nonzero;
+
+  var out_file = in_name + "_" + map_type + "_" + Ha_string + "Ha.nc";
   CreateNetCDF(out_file, ImageSpace, varid);
 
   writeln("Elapsed time at start of coforall loop: ", t.elapsed(), " seconds.");
@@ -167,7 +181,7 @@ proc main(args: [] string) {
     var locImage : [locD_plus] int(8);
 
     // Read in array
-    var f = open(in_array, iomode.r);
+    var f = open(in_name + "_" + map_type + ".bin", iomode.r);
     var first_point = locD_plus.first[0]*locD_plus.shape[1] + locD_plus.first[1];
     var r = f.reader(kind=ionative, region=first_point..);
 
@@ -188,11 +202,13 @@ proc main(args: [] string) {
     const locDiss : [locDissDomain] dissimilarity.eltType = dissimilarity;
 
     convolve_and_calculate(locImage, D.localSubdomain(), locLeftMaskDomain, locCenterMaskDomain, locRightMaskDomain, locDiss, OutputArray, loc_d_size, loc_Mask_Size, t);
+
+    //WriteOutput(out_file, OutputArray, varid);
   }
 
   writeln("Elapsed time to finish coforall loop: ", t.elapsed(), " seconds.");
 
-  WriteOutput(out_file, OutputArray, ImageSpace, varid, offset);
+  WriteOutput(out_file, OutputArray, varid);
 
   writeln("Elapsed time to write NetCDF: ", t.elapsed(), " seconds.");
 
